@@ -9,4 +9,4 @@ From the terminal, go into the directory where spatialjointerminal.cpp is and ty
 
 ## To run the code after compiling :
 
-Type **./spatial **
+Type ** ./spatial  **
