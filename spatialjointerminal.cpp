@@ -11,6 +11,7 @@
 #include <tuple>
 #include <chrono>
 #include <random>
+#include <immintrin.h>
 
 
 //global variable to keep track of the number of joins that occured
@@ -100,234 +101,33 @@ spatial_join_list_t RectangleSet::spatial_join(rectangle_list_t R, rectangle_lis
 	spatial_list.reserve(10000000);   
 
 	//outer loop iterating through R
-	for (auto i = 0; i < R.size() - 19; i+=20) {
+	for (auto i = 0; i < R.size() - 99; i+=100) {
 
 		//inner loop iterating through S (S.sizr() - 3 to not go out of bounds) via loop unrolling
 		for (auto j = 0; j < S.size(); j++) {
 
+			for (int k = 0 ; k < 100; k++) {
+
+
+
+				if ((R[i + k].first.first <= S[j].second.first)
+					&& (S[j].first.first <= R[i + k].second.first)
+					&& (R[i + k].first.second <= S[j].second.second)
+					&& (S[j].first.second <= R[i + k].second.second)
+					) {
+
+					spatial_list.push_back({ R[i + k], S[j] });
+					joins_count += 1;
+
+				}
+
+			}
+			
+
+
 			//condition to check if a particular MBR object in R overlaps with ANY objects in S
-			if ((R[i].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i].second.first)
-				&& (R[i].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i].second.second)
-				) {
-
-				spatial_list.push_back({ R[i], S[j] });
-				joins_count += 1;
-
-
-			}
-
-			if ((R[i+1].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i+1].second.first)
-				&& (R[i+1].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i+1].second.second)
-				) {
-
-				spatial_list.push_back({ R[i+1], S[j] });
-				joins_count += 1;
-
-
-			}
-
-			if ((R[i+2].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i+2].second.first)
-				&& (R[i+2].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i+2].second.second)
-				) {
-
-				spatial_list.push_back({ R[i+2], S[j] });
-				joins_count += 1;
-
-
-			}
-
-			if ((R[i+3].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i+3].second.first)
-				&& (R[i+3].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i+3].second.second)
-				) {
-
-				spatial_list.push_back({ R[i+3], S[j] });
-				joins_count += 1;
-
-			}
-
-			if ((R[i + 4].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i + 4].second.first)
-				&& (R[i + 4].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i + 4].second.second)
-				) {
-
-				spatial_list.push_back({ R[i + 4], S[j] });
-				joins_count += 1;
-
-			}
-
-			if ((R[i + 5].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i + 5].second.first)
-				&& (R[i + 5].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i + 5].second.second)
-				) {
-
-				spatial_list.push_back({ R[i + 5], S[j] });
-				joins_count += 1;
-
-			}
-
-			if ((R[i + 6].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i + 6].second.first)
-				&& (R[i + 6].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i + 6].second.second)
-				) {
-
-				spatial_list.push_back({ R[i + 6], S[j] });
-				joins_count += 1;
-
-			}
-
-			if ((R[i + 7].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i + 7].second.first)
-				&& (R[i + 7].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i + 7].second.second)
-				) {
-
-				spatial_list.push_back({ R[i + 7], S[j] });
-				joins_count += 1;
-
-			}
-
-			if ((R[i + 8].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i + 8].second.first)
-				&& (R[i + 8].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i + 8].second.second)
-				) {
-
-				spatial_list.push_back({ R[i + 8], S[j] });
-				joins_count += 1;
-
-			}
-
-			if ((R[i + 9].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i + 9].second.first)
-				&& (R[i + 9].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i + 9].second.second)
-				) {
-
-				spatial_list.push_back({ R[i + 9], S[j] });
-				joins_count += 1;
-
-			}
-
-			if ((R[i + 10].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i + 10].second.first)
-				&& (R[i + 10].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i + 10].second.second)
-				) {
-
-				spatial_list.push_back({ R[i + 10], S[j] });
-				joins_count += 1;
-
-			}
-
-			if ((R[i + 11].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i + 11].second.first)
-				&& (R[i + 11].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i + 11].second.second)
-				) {
-
-				spatial_list.push_back({ R[i + 11], S[j] });
-				joins_count += 1;
-
-			}
-
-			if ((R[i + 12].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i + 12].second.first)
-				&& (R[i + 12].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i + 12].second.second)
-				) {
-
-				spatial_list.push_back({ R[i + 12], S[j] });
-				joins_count += 1;
-
-			}
-
-			if ((R[i + 13].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i + 13].second.first)
-				&& (R[i + 13].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i + 13].second.second)
-				) {
-
-				spatial_list.push_back({ R[i + 13], S[j] });
-				joins_count += 1;
-
-			}
-
-			if ((R[i + 14].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i + 14].second.first)
-				&& (R[i + 14].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i + 14].second.second)
-				) {
-
-				spatial_list.push_back({ R[i + 14], S[j] });
-				joins_count += 1;
-
-			}
-
-			if ((R[i + 15].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i + 15].second.first)
-				&& (R[i + 15].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i + 15].second.second)
-				) {
-
-				spatial_list.push_back({ R[i + 15], S[j] });
-				joins_count += 1;
-
-			}
-
-			if ((R[i + 16].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i + 16].second.first)
-				&& (R[i + 16].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i + 16].second.second)
-				) {
-
-				spatial_list.push_back({ R[i + 16], S[j] });
-				joins_count += 1;
-
-			}
-
-			if ((R[i + 17].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i + 17].second.first)
-				&& (R[i + 17].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i + 17].second.second)
-				) {
-
-				spatial_list.push_back({ R[i + 17], S[j] });
-				joins_count += 1;
-
-			}
-
-			if ((R[i + 18].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i + 18].second.first)
-				&& (R[i + 18].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i + 18].second.second)
-				) {
-
-				spatial_list.push_back({ R[i + 18], S[j] });
-				joins_count += 1;
-
-			}
-
-			if ((R[i + 19].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i + 19].second.first)
-				&& (R[i + 19].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i + 19].second.second)
-				) {
-
-				spatial_list.push_back({ R[i + 19], S[j] });
-				joins_count += 1;
-
-			}
+			
+			
 
 		}
 	}
