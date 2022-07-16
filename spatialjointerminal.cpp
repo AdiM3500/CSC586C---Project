@@ -11,11 +11,14 @@
 #include <tuple>
 #include <chrono>
 #include <random>
+#include <immintrin.h>
+#include <omp.h>
 
 
 //global variable to keep track of the number of joins that occured
 long long int joins_count = 0;
 long long int naive_joins_count = 0;
+long long int tiling_joins_count = 0;
 using coordinate_t = std::pair <int, int>;
 using pair_of_coordinates_t = std::pair<coordinate_t, coordinate_t>;
 using rectangle_list_t = std::vector<pair_of_coordinates_t>;
@@ -34,7 +37,7 @@ public:
 	//naive spatial join function
 	spatial_join_list_t naive_spatial_join(rectangle_list_t R, rectangle_list_t S);
 
-
+	spatial_join_list_t tiling_spatial_join(rectangle_list_t R, rectangle_list_t S);
 
 
 	RectangleSet(rectangle_list_t const& mbrs_to_insert) {
@@ -53,9 +56,54 @@ public:
 
 	~RectangleSet() {
 
-		std::cout << "object destroyed"<<std::endl;
+		std::cout << "object destroyed" << std::endl;
 	}
 };
+
+
+spatial_join_list_t RectangleSet::tiling_spatial_join(rectangle_list_t R, rectangle_list_t S) {
+
+	//R x S
+	spatial_join_list_t tiling_spatial_list;
+	tiling_spatial_list.reserve(10000000);
+
+	//outer loop iterating through R
+	for (auto i = 0; i < R.size() - 49; i += 50) {
+
+		//inner loop iterating through S (S.sizr() - 3 to not go out of bounds) via loop unrolling
+		for (auto j = 0; j < S.size(); j++) {
+
+			for (int k = 0; k < 50; k++) {
+
+
+
+				if ((R[i + k].first.first < S[j].second.first)
+					&& (S[j].first.first < R[i + k].second.first)
+					&& (R[i + k].first.second < S[j].second.second)
+					&& (S[j].first.second < R[i + k].second.second)
+					) {
+
+					//tiling_spatial_list.push_back({ R[i + k], S[j] });
+					tiling_joins_count += 1;
+
+				}
+
+			}
+
+
+
+			//condition to check if a particular MBR object in R overlaps with ANY objects in S
+
+
+
+		}
+	}
+
+
+	return tiling_spatial_list;
+}
+
+
 
 
 
@@ -71,19 +119,19 @@ spatial_join_list_t RectangleSet::naive_spatial_join(rectangle_list_t R, rectang
 		for (auto j = 0; j < S.size(); j++) {
 
 			//condition to check if a particular MBR object in R overlaps with ANY objects in S
-			if ((R[i].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i].second.first)
-				&& (R[i].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i].second.second)
+			if ((R[i].first.first < S[j].second.first)
+				&& (S[j].first.first < R[i].second.first)
+				&& (R[i].first.second < S[j].second.second)
+				&& (S[j].first.second < R[i].second.second)
 				) {
 
-				spatial_list.push_back({ R[i], S[j] });
+				//spatial_list.push_back({ R[i], S[j] });
 				naive_joins_count += 1;
 
 
 			}
 
-			
+
 
 		}
 	}
@@ -97,237 +145,101 @@ spatial_join_list_t RectangleSet::spatial_join(rectangle_list_t R, rectangle_lis
 
 	//R x S
 	spatial_join_list_t spatial_list;
-	spatial_list.reserve(10000000);   
+	spatial_list.reserve(10000000);
+	int  num_threads = 6;
+	omp_set_num_threads(6);
 
-	//outer loop iterating through R
-	for (auto i = 0; i < R.size() - 19; i+=20) {
+	//outer loop iterating through R but i increments by 4
 
-		//inner loop iterating through S (S.sizr() - 3 to not go out of bounds) via loop unrolling
-		for (auto j = 0; j < S.size(); j++) {
+	for (auto i = 0; i < R.size() - 3; i += 4) {
+
+#pragma omp parallel for reduction (+:joins_count) 
+		for (auto j = 0; j < S.size() ; j++) {
+
+
+				//8 Rectangles of set R disintegrated into its smallest elements i.e. coordinates, which are 32 bit integers. Packed into an _m128i datatype. Each _m128i datatype can store 4 32-bit integers
+				__m128i setR_min_x = _mm_set_epi32(R[i].first.first, R[i + 1].first.first, R[i + 2].first.first, R[i + 3].first.first);
+				__m128i setR_min_y = _mm_set_epi32(R[i].first.second, R[i + 1].first.second, R[i + 2].first.second, R[i + 3].first.second);
+				__m128i	setR_max_x = _mm_set_epi32(R[i].second.first, R[i + 1].second.first, R[i + 2].second.first, R[i + 3].second.first);
+				__m128i	setR_max_y = _mm_set_epi32(R[i].second.second, R[i + 1].second.second, R[i + 2].second.second, R[i + 3].second.second);
+
+
+				__m128i setS_min_x = _mm_set_epi32(S[j].first.first, S[j].first.first, S[j].first.first, S[j].first.first);
+				__m128i setS_min_y = _mm_set_epi32(S[j].first.second, S[j].first.second, S[j].first.second, S[j].first.second);
+				__m128i	setS_max_x = _mm_set_epi32(S[j].second.first, S[j].second.first, S[j].second.first, S[j].second.first);
+				__m128i	setS_max_y = _mm_set_epi32(S[j].second.second, S[j].second.second, S[j].second.second, S[j].second.second);
+
+
+				auto first_comparison = _mm_cmplt_epi32(setR_min_x, setS_max_x);
+				auto second_comparison = _mm_cmpgt_epi32(setR_max_x, setS_min_x);
+				auto third_comparison = _mm_cmplt_epi32(setR_min_y, setS_max_y);
+				auto fourth_comparison = _mm_cmpgt_epi32(setR_max_y, setS_min_y);
+
+
+
+				//overlap_satisfied_index[0] = _mm_extract_epi32(first_comparison, 3) * _mm_extract_epi32(second_comparison, 3) * _mm_extract_epi32(third_comparison, 3) * _mm_extract_epi32(fourth_comparison, 3);
+				//overlap_satisfied_index[1] = _mm_extract_epi32(first_comparison, 2) * _mm_extract_epi32(second_comparison, 2) * _mm_extract_epi32(third_comparison, 2) * _mm_extract_epi32(fourth_comparison, 2);
+				//overlap_satisfied_index[2] = _mm_extract_epi32(first_comparison, 1) * _mm_extract_epi32(second_comparison, 1) * _mm_extract_epi32(third_comparison, 1) * _mm_extract_epi32(fourth_comparison, 1);
+				//overlap_satisfied_index[3] = _mm_extract_epi32(first_comparison, 0) * _mm_extract_epi32(second_comparison, 0) * _mm_extract_epi32(third_comparison, 0) * _mm_extract_epi32(fourth_comparison, 0);
+
+				joins_count+= _mm_extract_epi32(first_comparison, 3) * _mm_extract_epi32(second_comparison, 3) * _mm_extract_epi32(third_comparison, 3) * _mm_extract_epi32(fourth_comparison, 3);
+				joins_count+= _mm_extract_epi32(first_comparison, 2) * _mm_extract_epi32(second_comparison, 2) * _mm_extract_epi32(third_comparison, 2) * _mm_extract_epi32(fourth_comparison, 2);
+				joins_count+= _mm_extract_epi32(first_comparison, 1) * _mm_extract_epi32(second_comparison, 1) * _mm_extract_epi32(third_comparison, 1) * _mm_extract_epi32(fourth_comparison, 1);
+				joins_count+= _mm_extract_epi32(first_comparison, 0) * _mm_extract_epi32(second_comparison, 0) * _mm_extract_epi32(third_comparison, 0) * _mm_extract_epi32(fourth_comparison, 0);
+				
+			 /* 	for (auto ii = 0; ii < 4; ii++) {
+
+					if (overlap_satisfied_index[ii] == 1) {
+
+						//spatial_list.push_back({ R[i + ii], S[j] });
+						joins_count += 1;
+					}
+				}
+
+				*/
+				
+
+
+
+				/*DO THE ABOVE AGAIN FOR 4 MORE ITERATIONS*/
+
+
+			
+
+				//NEXT 8 ITERATIONS. TOTAL 16 ITERATIONS
+				
+				//next 4 iterations:
+
+				
+
+
+
+
+		//		__mmask8 second_comparison = _mm_cmpge_epi32_mask(setR_max_x, setS_min_x);
+		//		__mmask8 third_comparison = _mm_cmple_epi32_mask(setR_min_y, setS_max_y);
+		//		__mmask8 fourth_comparison = _mm_cmpge_epi32_mask(setR_max_y, setS_min_y);
+
+
+			/*	if ((R[i + k].first.first < S[j].second.first)
+					&& (S[j].first.first < R[i + k].second.first)
+					&& (R[i + k].first.second < S[j].second.second)
+					&& (S[j].first.second < R[i + k].second.second)
+					) {
+
+					spatial_list.push_back({ R[i + k], S[j] });
+					joins_count += 1;
+
+				}
+				*/
+
+
+			
+
+
 
 			//condition to check if a particular MBR object in R overlaps with ANY objects in S
-			if ((R[i].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i].second.first)
-				&& (R[i].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i].second.second)
-				) {
-
-				spatial_list.push_back({ R[i], S[j] });
-				joins_count += 1;
 
 
-			}
-
-			if ((R[i+1].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i+1].second.first)
-				&& (R[i+1].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i+1].second.second)
-				) {
-
-				spatial_list.push_back({ R[i+1], S[j] });
-				joins_count += 1;
-
-
-			}
-
-			if ((R[i+2].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i+2].second.first)
-				&& (R[i+2].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i+2].second.second)
-				) {
-
-				spatial_list.push_back({ R[i+2], S[j] });
-				joins_count += 1;
-
-
-			}
-
-			if ((R[i+3].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i+3].second.first)
-				&& (R[i+3].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i+3].second.second)
-				) {
-
-				spatial_list.push_back({ R[i+3], S[j] });
-				joins_count += 1;
-
-			}
-
-			if ((R[i + 4].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i + 4].second.first)
-				&& (R[i + 4].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i + 4].second.second)
-				) {
-
-				spatial_list.push_back({ R[i + 4], S[j] });
-				joins_count += 1;
-
-			}
-
-			if ((R[i + 5].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i + 5].second.first)
-				&& (R[i + 5].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i + 5].second.second)
-				) {
-
-				spatial_list.push_back({ R[i + 5], S[j] });
-				joins_count += 1;
-
-			}
-
-			if ((R[i + 6].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i + 6].second.first)
-				&& (R[i + 6].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i + 6].second.second)
-				) {
-
-				spatial_list.push_back({ R[i + 6], S[j] });
-				joins_count += 1;
-
-			}
-
-			if ((R[i + 7].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i + 7].second.first)
-				&& (R[i + 7].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i + 7].second.second)
-				) {
-
-				spatial_list.push_back({ R[i + 7], S[j] });
-				joins_count += 1;
-
-			}
-
-			if ((R[i + 8].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i + 8].second.first)
-				&& (R[i + 8].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i + 8].second.second)
-				) {
-
-				spatial_list.push_back({ R[i + 8], S[j] });
-				joins_count += 1;
-
-			}
-
-			if ((R[i + 9].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i + 9].second.first)
-				&& (R[i + 9].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i + 9].second.second)
-				) {
-
-				spatial_list.push_back({ R[i + 9], S[j] });
-				joins_count += 1;
-
-			}
-
-			if ((R[i + 10].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i + 10].second.first)
-				&& (R[i + 10].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i + 10].second.second)
-				) {
-
-				spatial_list.push_back({ R[i + 10], S[j] });
-				joins_count += 1;
-
-			}
-
-			if ((R[i + 11].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i + 11].second.first)
-				&& (R[i + 11].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i + 11].second.second)
-				) {
-
-				spatial_list.push_back({ R[i + 11], S[j] });
-				joins_count += 1;
-
-			}
-
-			if ((R[i + 12].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i + 12].second.first)
-				&& (R[i + 12].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i + 12].second.second)
-				) {
-
-				spatial_list.push_back({ R[i + 12], S[j] });
-				joins_count += 1;
-
-			}
-
-			if ((R[i + 13].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i + 13].second.first)
-				&& (R[i + 13].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i + 13].second.second)
-				) {
-
-				spatial_list.push_back({ R[i + 13], S[j] });
-				joins_count += 1;
-
-			}
-
-			if ((R[i + 14].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i + 14].second.first)
-				&& (R[i + 14].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i + 14].second.second)
-				) {
-
-				spatial_list.push_back({ R[i + 14], S[j] });
-				joins_count += 1;
-
-			}
-
-			if ((R[i + 15].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i + 15].second.first)
-				&& (R[i + 15].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i + 15].second.second)
-				) {
-
-				spatial_list.push_back({ R[i + 15], S[j] });
-				joins_count += 1;
-
-			}
-
-			if ((R[i + 16].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i + 16].second.first)
-				&& (R[i + 16].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i + 16].second.second)
-				) {
-
-				spatial_list.push_back({ R[i + 16], S[j] });
-				joins_count += 1;
-
-			}
-
-			if ((R[i + 17].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i + 17].second.first)
-				&& (R[i + 17].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i + 17].second.second)
-				) {
-
-				spatial_list.push_back({ R[i + 17], S[j] });
-				joins_count += 1;
-
-			}
-
-			if ((R[i + 18].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i + 18].second.first)
-				&& (R[i + 18].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i + 18].second.second)
-				) {
-
-				spatial_list.push_back({ R[i + 18], S[j] });
-				joins_count += 1;
-
-			}
-
-			if ((R[i + 19].first.first <= S[j].second.first)
-				&& (S[j].first.first <= R[i + 19].second.first)
-				&& (R[i + 19].first.second <= S[j].second.second)
-				&& (S[j].first.second <= R[i + 19].second.second)
-				) {
-
-				spatial_list.push_back({ R[i + 19], S[j] });
-				joins_count += 1;
-
-			}
 
 		}
 	}
@@ -384,7 +296,7 @@ int main() {
 	auto setR = random_rectangle_generator();
 	auto setS = random_rectangle_generator();
 
-	/* FOR DISPLAYING PURPOSES TO SEE THE RECTANGLES IN BOTH SETS 
+	/* FOR DISPLAYING PURPOSES TO SEE THE RECTANGLES IN BOTH SETS
 	std::cout << "set R\n";
 	for (int n = 0; n < 10; ++n) {
 
@@ -397,7 +309,7 @@ int main() {
 
 		std::cout << setR[n].second.first << ' ';
 
-		
+
 
 		std::cout << setR[n].second.second << std::endl;
 
@@ -426,14 +338,14 @@ int main() {
 	*/
 
 
-	
+
 
 	RectangleSet R(setR);
 	RectangleSet S(setS);
 
 
 
-// **********OPTIMIZED JOIN FUNCTION BENCHMARKING**************
+	// **********OPTIMIZED JOIN FUNCTION BENCHMARKING**************
 	std::cout << std::endl;
 
 	spatial_join_list_t JOIN;
@@ -452,10 +364,33 @@ int main() {
 	std::cout << "Time in microseconds (optimized approach): " << elapsed_time.count() << "us" << std::endl;
 
 	std::cout << "Number of joins (optimized approach): " << joins_count << std::endl;
-	
 
 
-//**********NAIVE JOIN FUNCTION BENCHMARKING**********************
+	//**********TILING JOIN FUNCTION BENCHMARKING**********************
+	std::cout << std::endl;
+
+	spatial_join_list_t MID_JOIN;
+
+	//CLOCK START
+	auto mid_start = std::chrono::high_resolution_clock::now();
+
+	//CALL THE FUNCTION
+	MID_JOIN = R.tiling_spatial_join(R.mbrs, S.mbrs);
+
+	//CLOCK END
+	auto mid_end = std::chrono::high_resolution_clock::now();
+
+	auto mid_elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>
+		(mid_end - mid_start);
+
+	std::cout << "Time in microseconds (Tiling approach): " << mid_elapsed_time.count() << "us" << std::endl;
+
+
+	std::cout << "Number of joins (Tiling approach): " << tiling_joins_count << std::endl << std::endl;
+
+
+
+	//**********NAIVE JOIN FUNCTION BENCHMARKING**********************
 	std::cout << std::endl;
 
 	spatial_join_list_t OLD_JOIN;
@@ -475,9 +410,11 @@ int main() {
 	std::cout << "Time in microseconds (naive approach): " << naive_elapsed_time.count() << "us" << std::endl;
 
 
-	std::cout << "Number of joins (naive approach): " << naive_joins_count << std::endl <<std::endl;
+	std::cout << "Number of joins (naive approach): " << naive_joins_count << std::endl << std::endl;
 
-	
+
+
+
 
 	/* FOR DISPLAYING FIRST 5 JOINS BETWEEN R AND S
 	for (auto i = 0; i < 5 ; i++) {
@@ -491,9 +428,8 @@ int main() {
 	}
 
 	*/
-	
+
 
 }
-
 
 
