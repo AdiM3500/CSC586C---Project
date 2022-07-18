@@ -12,6 +12,4 @@ From the terminal, go into the directory where spatialjointerminal_final.cpp is 
 **g++ -Wall -Wextra -mavx -march=native -std=c++17 -g -O3 -o spatial spatialjointerminal_final.cpp**
 
 
-## To run the code after compiling type:
-
-./spatial 
+**To run the code after compiling type:** ./spatial 
