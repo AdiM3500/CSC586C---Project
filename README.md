@@ -9,7 +9,7 @@
 
 From the terminal, go into the directory where spatialjointerminal_final.cpp is and type the following command:
 
-**g++ -Wall -Wextra -mavx -march=native -std=c++17 -g -O3 -o spatial spatialjointerminal_final.cpp**
+**g++ -Wall -Wextra -mavx -march=native -std=c++17 -g -O3 -fopenmp -o spatial spatialjointerminal_final.cpp**
 
 
 **To run the code after compiling type:** ./spatial 
@@ -20,7 +20,7 @@ From the terminal, go into the directory where spatialjointerminal_final.cpp is 
 To compile the split files,  go into the directory where the 'split' cpp files are and type the following command:
 
 
-**g++ -Wall -Wextra -mavx -march=native -std=c++17 -g -O3 -o split_spatial [split_filename].cpp**
+**g++ -Wall -Wextra -mavx -march=native -std=c++17 -g -O3 -fopenmp -o split_spatial [split_filename].cpp**
 
 **To run the code after compiling type:** ./split_spatial 
 
